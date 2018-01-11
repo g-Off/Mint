@@ -12,30 +12,17 @@ struct PackagePath {
         self.package = package
     }
 
-    var gitPath: String { return PackagePath.gitURLFromString(package.repo) }
+    var gitPath: String { return "\(package.repo)" }
 
     var repoPath: String {
-        return gitPath
-            .components(separatedBy: "://").last!
-            .replacingOccurrences(of: "/", with: "_")
-            .replacingOccurrences(of: ".git", with: "")
+		return package.repo.path.replacingOccurrences(of: "/", with: "_")
+//        return gitPath
+//            .components(separatedBy: "://").last!
+//            .replacingOccurrences(of: "/", with: "_")
+//            .replacingOccurrences(of: ".git", with: "")
     }
 
     var packagePath: Path { return path + repoPath }
     var installPath: Path { return packagePath + "build" + package.version }
     var commandPath: Path { return installPath + package.name }
-
-    static func gitURLFromString(_ string: String) -> String {
-        if let url = URL(string: string), url.scheme != nil {
-            return url.absoluteString
-        } else {
-            if string.contains("github.com") {
-                return "https://\(string).git"
-            } else if string.contains(".") {
-                return "https://\(string)"
-            } else {
-                return "https://github.com/\(string).git"
-            }
-        }
-    }
 }
