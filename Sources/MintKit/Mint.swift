@@ -76,12 +76,9 @@ public struct Mint {
     }
 
     @discardableResult
-    public func run(repo: String, version: String, verbose: Bool = false, arguments: [String]? = nil) throws -> Package {
-        let guessedCommand = repo.components(separatedBy: "/").last!.components(separatedBy: ".").first!
-        let name = arguments?.first ?? guessedCommand
-        var arguments = arguments ?? [guessedCommand]
-        arguments = arguments.count > 1 ? Array(arguments.dropFirst()) : []
-        var git = repo
+    public func run(options: PackageOptions) throws -> Package {
+		let repo = options.package
+        var git = repo.path
         if !git.contains("/") {
             // find repo
             if let existingGit = try getPackageGit(name: git) {
@@ -90,13 +87,13 @@ public struct Mint {
                 throw MintError.packageNotFound(git)
             }
         }
-        let package = Package(repo: git, version: version, name: name)
-        try run(package, arguments: arguments, verbose: verbose)
+		let package = Package(repo: options.package, version: options.version, name: options.command)
+		try run(package, options: options)
         return package
     }
 
-    public func run(_ package: Package, arguments: [String], verbose: Bool) throws {
-        try install(package, update: false, verbose: verbose, global: false)
+	public func run(_ package: Package, options: PackageOptions) throws {
+		try install(package, options: options)
         print("🌱  Running \(package.commandVersion)...")
 
         var context = CustomContext(main)
@@ -104,24 +101,17 @@ public struct Mint {
         context.env["RESOURCE_PATH"] = ""
 
         let packagePath = PackagePath(path: packagesPath, package: package)
-        try context.runAndPrint(packagePath.commandPath.string, arguments)
+		try context.runAndPrint(packagePath.commandPath.string, options.arguments ?? [])
     }
 
     @discardableResult
-    public func install(repo: String, version: String, command: String?, update: Bool = false, verbose: Bool = false, global: Bool = false) throws -> Package {
-        let guessedCommand = repo.components(separatedBy: "/").last!.components(separatedBy: ".").first!
-        let name = command ?? guessedCommand
-        let package = Package(repo: repo, version: version, name: name)
-        try install(package, update: update, verbose: verbose, global: global)
+	public func install(options: PackageOptions, update: Bool = false) throws -> Package {
+		let package = Package(repo: options.package, version: options.package.tag ?? "", name: options.command)
+		try install(package, options: options, update: update)
         return package
     }
 
-    public func install(_ package: Package, update: Bool = false, verbose: Bool = false, global: Bool = false) throws {
-
-        if !package.repo.contains("/") {
-            throw MintError.invalidRepo(package.repo)
-        }
-
+    public func install(_ package: Package, options: PackageOptions, update: Bool = false) throws {
         let packagePath = PackagePath(path: packagesPath, package: package)
 
         if package.version.isEmpty {
@@ -149,7 +139,7 @@ public struct Mint {
         }
 
         if !update && packagePath.commandPath.exists {
-            if global {
+            if options.global {
                 try installGlobal(packagePath: packagePath)
             } else {
                 print("🌱  \(package.commandVersion) already installed".green)
@@ -165,7 +155,7 @@ public struct Mint {
         try? packageCheckoutPath.delete()
         print("🌱  Cloning \(packagePath.gitPath) \(package.version)...")
         do {
-            try runCommand("git clone --depth 1 -b \(package.version) \(packagePath.gitPath) \(packagePath.repoPath)", at: checkoutPath, verbose: verbose)
+            try runCommand("git clone --depth 1 -b \(package.version) \(packagePath.gitPath) \(packagePath.repoPath)", at: checkoutPath, verbose: options.verbose)
         } catch {
             throw MintError.repoNotFound(packagePath.gitPath)
         }
@@ -173,7 +163,17 @@ public struct Mint {
         try? packagePath.installPath.delete()
         try packagePath.installPath.mkpath()
         print("🌱  Building \(package.name). This may take a few minutes...")
-        try runCommand("swift build -c release", at: packageCheckoutPath, verbose: verbose)
+		var flags: [String] = []
+		flags += options.buildFlags.cCompilerFlags.flatMap({ ["-Xcc", $0] })
+		flags += options.buildFlags.swiftCompilerFlags.flatMap({ ["-Xswiftc", $0] })
+		flags += options.buildFlags.linkerFlags.flatMap({ ["-Xlinker", $0] })
+		
+		var command = "swift build -c release"
+		if !flags.isEmpty {
+			command += " \(flags.joined(separator: " "))"
+		}
+		
+        try runCommand(command, at: packageCheckoutPath, verbose: options.verbose)
 
         print("🌱  Installing \(package.name)...")
         let toolFile = packageCheckoutPath + ".build/release/\(package.name)"
@@ -202,7 +202,7 @@ public struct Mint {
         try addPackage(git: packagePath.gitPath, path: packagePath.packagePath)
 
         print("🌱  Installed \(package.commandVersion)".green)
-        if global {
+        if options.global {
             try installGlobal(packagePath: packagePath)
         }
 
