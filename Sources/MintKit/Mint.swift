@@ -6,7 +6,7 @@ import Utility
 
 public struct Mint {
 
-    public static let version = "0.8.0"
+    public static let version = "0.8.1"
 
     let path: Path
     let installationPath: Path
@@ -128,7 +128,7 @@ public struct Mint {
             } else {
                 let tags = tagReferences.split(separator: "\n").map { String($0.split(separator: "\t").last!.split(separator: "/").last!) }
                 let versions = Git.convertTagsToVersionMap(tags)
-                if let latestVersion = versions.keys.sorted().last, let tag = versions[latestVersion] {
+                if let latestVersion = versions.keys.sorted().last, let tag = versions[latestVersion]?.sorted().last {
                     package.version = tag
                 } else {
                     package.version = "master"
