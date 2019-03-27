@@ -18,7 +18,7 @@ let package = Package(
         // Dependencies declare other packages that this package depends on.
         .package(url: "https://github.com/kylef/PathKit.git", from: "0.8.0"),
         .package(url: "https://github.com/kareman/SwiftShell.git", from: "4.0.0"),
-        .package(url: "https://github.com/onevcat/Rainbow.git", from: "2.1.0"),
+        .package(url: "https://github.com/onevcat/Rainbow.git", from: "3.0.0"),
         .package(url: "https://github.com/apple/swift-package-manager.git", from: "0.1.0"),
         ],
     targets: [
